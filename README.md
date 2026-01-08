@@ -17,3 +17,12 @@ In the release folder you will find binaries, each one corresponding to a scenar
 *  Game with bots
 *  Lights demo
 *  Bots + night
+
+## Compile program
+
+From root :
+
+```bash
+cmake -S . -B build
+cmake --build build -j
+```
