@@ -26,3 +26,10 @@ From root :
 cmake -S . -B build
 cmake --build build -j
 ```
+## Fonctions thaz can be parallelize
+
+- `void Zombie::_getTarget()` in Zombie.cpp
+- `void Zombie::update(GameWorld& world)` in Zombie.cpp
+- `void Bot::getTarget(GameWorld* world)` in Bot.cpp
+- `void Bot::computeControls(GameWorld& world)` in Bot.cpp
+- `void Bot::update(GameWorld& world)` in Bot.cpp
