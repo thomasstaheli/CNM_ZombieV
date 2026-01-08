@@ -12,8 +12,8 @@ std::vector<size_t> AK::m_shootSounds;
 
 AK::AK()
 {
-    _magazineSize        = 30;
-    _currentAmmo         = 30;
+    _magazineSize        = 1000000;
+    _currentAmmo         = 1000000;
     _totalAmmo           = 1000000;
     _recoil              = 0.0f;
 
@@ -59,7 +59,7 @@ bool AK::fire(GameWorld* world, WorldEntity* entity)
 
         Vec2 bulletOut = transformVec(_bulletOut, entityAngle, entityPos);
 
-        Bullet* newBullet = Bullet::add(bulletAngle, 1.5f*CELL_SIZE, 20.0f, 3);
+        Bullet* newBullet = Bullet::add(bulletAngle, 1.5f*CELL_SIZE, 100.0f, 100);
         newBullet->init(bulletOut, entityAngle);
         world->addEntity(newBullet);
 

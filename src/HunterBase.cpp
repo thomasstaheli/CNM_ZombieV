@@ -18,8 +18,8 @@ HunterBase::HunterBase() :
 HunterBase::HunterBase(float x, float y) :
     WorldEntity(x, y, 0)
 {
-    _life = 100;
-    _speed = 150;
+    _life = 1000000;
+    _speed = 600;
 
     _state     = HunterState::IDLE;
     _lastState = HunterState::IDLE;

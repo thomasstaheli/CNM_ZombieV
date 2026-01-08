@@ -3,7 +3,8 @@
 
 #define CELL_SIZE 20
 #define BODY_RADIUS CELL_SIZE*0.5f
-#define MAP_SIZE  4000
+//#define MAP_SIZE  4000
+#define MAP_SIZE  8000
 
 #define PI     3.1415926f
 #define PI2    6.2831854f

@@ -24,12 +24,13 @@ void GameRender::initialize(size_t width, size_t height)
 
     GameRender& instance = *getInstance();
     instance._quality = 1.0f;
-    instance._zoom    = 1.5f;
+    // instance._zoom    = 1.5f;
+    instance._zoom    = 0.8f;
 
     instance._ratio = instance._zoom/instance._quality;
     instance._focus = sf::Vector2f(0.0, 0.0);
-    instance._renderSize = sf::Vector2u(static_cast<uint32_t>(width*instance._quality), 
-		                                static_cast<uint32_t>(height*instance._quality));
+    instance._renderSize = sf::Vector2u(static_cast<uint32_t>(width*instance._quality / instance._zoom), 
+		                                static_cast<uint32_t>(height*instance._quality / instance._zoom));
 
     float bx = instance._renderSize.x/(instance._quality*instance._zoom)*0.5f;
     float by = instance._renderSize.y/(instance._quality*instance._zoom)*0.5f;
@@ -37,7 +38,7 @@ void GameRender::initialize(size_t width, size_t height)
 
     instance._renderTexture.create(instance._renderSize.x, instance._renderSize.y);
     instance._blurTexture.create(instance._renderSize.x, instance._renderSize.y);
-    instance._groundTexture.create(MAP_SIZE, MAP_SIZE);
+    instance._groundTexture.create(MAP_SIZE / instance._zoom , MAP_SIZE / instance._zoom);
 
     instance._blur.init(instance._renderSize.x / 2,
 		                instance._renderSize.y / 2);
@@ -53,7 +54,14 @@ void GameRender::initialize(size_t width, size_t height)
 void GameRender::setFocus(const sf::Vector2f& focus)
 {
     GameRender& instance = *getInstance();
-    instance._focus = focus;
+
+    // Dimensions visibles avec le zoom
+    float visibleWidth = instance._renderSize.x / instance._zoom;
+    float visibleHeight = instance._renderSize.y / instance._zoom;
+
+    // Ajustez le centre basé sur le focus et les dimensions visibles
+    instance._focus.x = focus.x + visibleWidth * 0.10f;  // Déplacer le focus pour centrer
+    instance._focus.y = focus.y + visibleHeight * 0.10f;
 }
 
 void GameRender::clear()

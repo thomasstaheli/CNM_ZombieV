@@ -23,7 +23,7 @@ Zombie::Zombie(float x, float y) :
     StandardEntity(x, y, 0.0f),
     _vertexArray(sf::VertexArray(sf::Quads, 4))
 {
-    _speed = 150;
+    _speed = 500;
     _life  = 100;
     _done  = false;
 
@@ -86,8 +86,8 @@ void Zombie::update(GameWorld& world)
 
         if (_currentState == MOVING)
         {
-            float speed = 75;
-            move(speed*direction.x, speed*direction.y);
+            // float speed = 75;
+            move(_speed*direction.x, _speed*direction.y);
         }
         else if (_currentAnimation.isDone())
         {
