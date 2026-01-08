@@ -110,9 +110,10 @@ void Zombie::update(GameWorld& world)
 
     if (_life<0)
     {
-        world.addEntity(ExplosionProvider::getBig(m_coord, true));
-        world.addEntity(ExplosionProvider::getBigFast(m_coord));
-        world.addEntity(ExplosionProvider::getBase(m_coord));
+        // Flaque de sang lorsque le zombie meurt
+        //world.addEntity(ExplosionProvider::getBig(m_coord, true));
+        //world.addEntity(ExplosionProvider::getBigFast(m_coord));
+        //world.addEntity(ExplosionProvider::getBase(m_coord));
         _done = true;
     }
 
@@ -171,12 +172,14 @@ void Zombie::hit(WorldEntity* entity, GameWorld* gameWorld)
             if (GameRender::isVisible(this))
             {
                 gameWorld->addEntity(ExplosionProvider::getBase(pos));
+                
                 if (bullet->getDistance() < 50.0f)
                 {
                     gameWorld->addEntity(ExplosionProvider::getClose(pos, bulletAngle));
                     gameWorld->addEntity(Guts::add(pos, bullet->getV()*40.f));
                 }
-
+                // Sang lors qu'une balle touche un zombies
+                /*
                 if (bullet->getPenetration() > -1.0f)
                 {
                     gameWorld->addEntity(ExplosionProvider::getThrough(pos, bulletAngle, true));
@@ -187,6 +190,7 @@ void Zombie::hit(WorldEntity* entity, GameWorld* gameWorld)
                 {
                     gameWorld->addEntity(ExplosionProvider::getHit(pos, bulletAngle+PI, true));
                 }
+                */
             }
 
             break;

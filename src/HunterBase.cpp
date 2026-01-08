@@ -28,8 +28,8 @@ HunterBase::HunterBase(float x, float y) :
 
     _vertexArray = sf::VertexArray(sf::Quads, 4);
 
-    _weapons.push_back(new AK);
-    //_weapons.push_back(new Shotgun);
+    //_weapons.push_back(new AK);
+    _weapons.push_back(new Shotgun);
     //_weapons.push_back(new Pistol);
 
     _currentWeapon = _weapons.back();
