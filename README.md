@@ -20,13 +20,13 @@ In the release folder you will find binaries, each one corresponding to a scenar
 
 ## Compile program
 
-From root :
+From root, base of the repository :
 
 ```bash
 cmake -S . -B build
 cmake --build build -j
 ```
-## Fonctions thaz can be parallelize
+## Fonctions that can be parallelize
 
 - `void Zombie::_getTarget()` in Zombie.cpp
 - `void Zombie::update(GameWorld& world)` in Zombie.cpp
