@@ -1,4 +1,5 @@
 #include <iostream>
+#include <array>
 #include <SFML/Graphics.hpp>
 
 #include "System/GameWorld.hpp"
@@ -28,30 +29,36 @@ int main()
     world.initEventHandler(window);
 
     Hunter::registerObject(&world);
+    Bot::registerObject(&world);
 
 	world.initializeWeapons();
 
     world.getPhyManager().setGravity(Vec2(0, 0));
 
     Hunter& h = *Hunter::newEntity(static_cast<float>(MAP_SIZE/2), static_cast<float>(MAP_SIZE/2));
-    world.addEntity(&h);
+    std::array<Bot*, 10> bots;
+
+    //world.addEntity(&h);
 
     int waveCount = 0;
 
-    /*
-    for (int i(2); i--;)
+    for (int i = 0; i < 10; ++i)
     {
-        world.addEntity(Bot::newEntity(static_cast<float>(MAP_SIZE / 2 + rand() % 10), static_cast<float>(MAP_SIZE / 2 + rand() % 10)));
+        bots[i] = Bot::newEntity(static_cast<float>(MAP_SIZE / 2 + rand() % 10), 
+                                static_cast<float>(MAP_SIZE / 2 + rand() % 10));
+        world.addEntity(bots[i]);
     }
-    */
 
     sf::Mouse::setPosition(sf::Vector2i(WIN_WIDTH/2+100, WIN_HEIGHT/2));
 
     Zombie* newZombie;
-    for (int i(100); i--;)
+    std::cout << h.getID() << std::endl;
+
+    for (int i(10); i--;)
     {
         newZombie = Zombie::newEntity(getRandUnder(static_cast<float>(MAP_SIZE)), getRandUnder(static_cast<float>(MAP_SIZE)));
-		EntityID target = h.getID();
+		Bot& bot = *bots[i % 10];
+		EntityID target = bot.getID();
 		newZombie->setTarget(target);
         world.addEntity(newZombie);
     }
@@ -96,6 +103,7 @@ int main()
         }
 
         sf::Clock clock;
+
         world.update();
 
 		int upTime = clock.getElapsedTime().asMilliseconds();
