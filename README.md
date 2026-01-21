@@ -23,9 +23,24 @@ In the release folder you will find binaries, each one corresponding to a scenar
 From root, base of the repository :
 
 ```bash
-cmake -S . -B build
-cmake --build build -j
+cd build
+# It will build and launch the game
+../run.sh
 ```
+
+To quit the game, you can press escape (ESC) or you can click on the cross on the top right of the window.
+
+## Profiling
+
+Each run, there is a file, called `mresures_fps.csv` that save the differents measures of the FPS.
+If you want to see the differents measure, you can display it with the python script from root.
+
+You will need, `python3` with the librairies `panda` and `matplotlib`.
+
+```bash
+python3 plot_mesure.py
+```
+
 ## Fonctions that can be parallelize
 
 - `void Zombie::_getTarget()` in Zombie.cpp
