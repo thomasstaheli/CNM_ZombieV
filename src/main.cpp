@@ -2,6 +2,9 @@
 #include <array>
 #include <SFML/Graphics.hpp>
 
+#include <fstream> // Added for profiling
+#include <deque>
+
 #include "System/GameWorld.hpp"
 #include "System/GameRender.hpp"
 
@@ -36,12 +39,14 @@ int main()
     world.getPhyManager().setGravity(Vec2(0, 0));
 
     Hunter& h = *Hunter::newEntity(static_cast<float>(MAP_SIZE/2), static_cast<float>(MAP_SIZE/2));
+    // Tableau de bot
     std::array<Bot*, 10> bots;
-
+    // Joueur
     //world.addEntity(&h);
 
     int waveCount = 0;
 
+    // Création de 10 bots
     for (int i = 0; i < 10; ++i)
     {
         bots[i] = Bot::newEntity(static_cast<float>(MAP_SIZE / 2 + rand() % 10), 
@@ -52,9 +57,9 @@ int main()
     sf::Mouse::setPosition(sf::Vector2i(WIN_WIDTH/2+100, WIN_HEIGHT/2));
 
     Zombie* newZombie;
-    std::cout << h.getID() << std::endl;
 
-    for (int i(10); i--;)
+    // Nombre de zombies initiaux à la vague numéro 1
+    for (int i(100); i--;)
     {
         newZombie = Zombie::newEntity(getRandUnder(static_cast<float>(MAP_SIZE)), getRandUnder(static_cast<float>(MAP_SIZE)));
 		Bot& bot = *bots[i % 10];
@@ -72,12 +77,62 @@ int main()
         GameRender::getLightEngine().addDurableLight(light);
     }
 
-    int frameCount = 0;
-    float ttime = 0;
+    // <--- AJOUT : Préparation du fichier CSV
+    std::ofstream csvFile("mesures_fps.csv");
+    // On écrit l'en-tête des colonnes (Le point-virgule est souvent mieux reconnu par Excel qu'une virgule)
+    csvFile << "Vague;Frame_Index;Temps_Total(ms);FPS_Instantane\n";
+    
+    int frameCountGlobal = 0;
+    sf::Clock frameClock; // Clock for profiling
+    int frames = 0;
+    float timer = 0;
+    std::deque<float> last10Frames; // File pour garder les 10 dernières mesures
+
     while (window.isOpen())
     {
-        ++frameCount;
+        sf::Time dt = frameClock.restart();
+        float dtMillis = dt.asMilliseconds();
 
+        // 2. Gestion du stockage des 10 dernières mesures
+        last10Frames.push_back(dtMillis);
+        if (last10Frames.size() > 10) {
+            last10Frames.pop_front(); // On enlève la plus vieille pour garder toujours 10 éléments
+        }
+
+        // 3. Mise à jour des compteurs "seconde"
+        timer += dt.asSeconds();
+        frames++;
+
+        // Logique d'enregistrement CSV
+        if (timer >= 1.0f) 
+        {
+            float avgFps = frames / timer; // Calcul précis
+            
+            // A. Mise à jour du titre
+            std::string title = "Zombie V - Wave: " + std::to_string(waveCount) + 
+                                " - FPS: " + std::to_string((int)avgFps) + 
+                                " (" + std::to_string(1000.0f/avgFps) + " ms)";
+            window.setTitle(title);
+
+            // B. Écriture dans le CSV
+            // On écrit : Vague ; FPS Moyen ; F1 ; F2 ... ; F10
+            csvFile << waveCount << ";" << (int)avgFps;
+            
+            for (float t : last10Frames) {
+                csvFile << ";" << t;
+            }
+            // Si jamais on a moins de 10 frames (ex: début du programme ou lag extrême), on comble avec des vides
+            for (size_t i = last10Frames.size(); i < 10; ++i) {
+                csvFile << ";"; 
+            }
+            csvFile << "\n";
+
+            // C. Reset pour la seconde suivante
+            frames = 0;
+            timer = 0;
+        }
+
+        ++frameCountGlobal;
         if (Zombie::getObjectsCount() == 0)
         {
             ++waveCount;
@@ -93,21 +148,14 @@ int main()
         sf::Event event;
         while (window.pollEvent(event))
         {
-			switch (event.type)
-			{
-				case sf::Event::KeyPressed:
-					if (event.key.code == sf::Keyboard::Escape) window.close();
-				default:
-                    break;
-			}
+            if (event.type == sf::Event::Closed) window.close();
+            if (event.type == sf::Event::KeyPressed)
+                if (event.key.code == sf::Keyboard::Escape) window.close();
         }
 
         sf::Clock clock;
-
+        // Update de toutes les entités dans le monde
         world.update();
-
-		int upTime = clock.getElapsedTime().asMilliseconds();
-        ttime += upTime;
 
         Vec2 p = h.getCoord();
 		GameRender::setFocus({ p.x, p.y });
@@ -119,6 +167,9 @@ int main()
 
         window.display();
     }
+
+    // Fermeture propre du fichier
+    csvFile.close();
 
     return 0;
 }

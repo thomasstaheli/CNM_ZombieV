@@ -1,9 +1,12 @@
 #ifndef CONFIG_HPP_INCLUDED
 #define CONFIG_HPP_INCLUDED
 
+// Add new config for PoolObject
+#define POOL_OBJECT_SIZE 20000
+
 #define CELL_SIZE 20
 #define BODY_RADIUS CELL_SIZE*0.5f
-//#define MAP_SIZE  4000
+// #define MAP_SIZE  4000 // -> orginal size
 #define MAP_SIZE  8000
 
 #define PI     3.1415926f

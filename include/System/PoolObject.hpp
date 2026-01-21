@@ -2,6 +2,7 @@
 #define POOLOBJECT_HPP_INCLUDED
 
 #include "System/ChainedObject.hpp"
+#include "System/Config.hpp"
 
 /* Wrapper to allow creation of "Pooled object"
 e.g. objects that statically handle the storage of their own instances*/
@@ -38,7 +39,7 @@ private:
 ///////////////////////////////////////////////////////////////////////
 
 template<class T>
-Pool<T> PoolObject<T>::s_pool(10000);
+Pool<T> PoolObject<T>::s_pool(POOL_OBJECT_SIZE);
 
 template<class T>
 uint32_t PoolObject<T>::m_classID;
