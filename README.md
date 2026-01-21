@@ -20,6 +20,12 @@ In the release folder you will find binaries, each one corresponding to a scenar
 
 ## Compile program
 
+To run this programm you will need :
+
+- C++ compilator with C++17 or above
+- Cmake version 3.10 or above
+- SFML library
+
 From root, base of the repository :
 
 ```bash
