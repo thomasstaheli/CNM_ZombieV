@@ -1,6 +1,15 @@
+#include <limits> // Pour float max
+#include <omp.h>
+
 #include "Bot.hpp"
 #include "System/GameWorld.hpp"
 #include "Zombie.hpp"
+
+// Une petite structure pour stocker le résultat d'un thread
+struct SearchResult {
+    float minDist = std::numeric_limits<float>::max();
+    Zombie* target = nullptr;
+};
 
 Bot::Bot() :
     HunterBase(0, 0),
@@ -129,16 +138,99 @@ void Bot::computeControls(GameWorld& world)
 void Bot::getTarget(GameWorld* world)
 {
     ++m_getTargetCount;
+
+    // --- ÉTAPE 1 : Préparation ---
+    std::vector<Zombie*> zombies;
+    zombies.reserve(10000);
+    Zombie* z = nullptr;
+    while (Zombie::getNext(z)) {
+        zombies.push_back(z);
+    }
+
+    int nZombies = zombies.size();
+    if (nZombies == 0) return;
+
+    Vec2 myPos = getCoord();
+
+    // On détermine combien de threads on veut utiliser AU MAXIMUM
+    int desiredThreads = 10; 
+    
+    // On récupère le max possible sur la machine pour ne pas demander l'impossible
+    int hardwareMax = omp_get_max_threads();
+    int actualThreads = std::min(desiredThreads, hardwareMax);
+
+    // On crée le tableau de résultats avec la taille EXACTE du nombre de threads qu'on va lancer
+    std::vector<SearchResult> threadResults(actualThreads);
+    
+    // --- ÉTAPE 2 : Recherche Parallèle ---
+    // On force le nombre de threads ici avec num_threads()
+    #pragma omp parallel num_threads(actualThreads)
+    {
+        int threadID = omp_get_thread_num();
+        
+        // Initialisation locale
+        float localMinDist = std::numeric_limits<float>::max();
+        Zombie* localTarget = nullptr;
+
+        // On laisse OpenMP découper la boucle complète (0 à nZombies)
+        // C'est beaucoup plus sûr que le calcul manuel
+        #pragma omp for nowait
+        for (int i = 0; i < nZombies; ++i)
+        {
+            Zombie* currentZombie = zombies[i];
+            Vec2 zPos = currentZombie->getCoord();
+            
+            float dx = zPos.x - myPos.x;
+            float dy = zPos.y - myPos.y;
+            float distSq = dx*dx + dy*dy;
+
+            if (distSq < localMinDist) {
+                localMinDist = distSq;
+                localTarget = currentZombie;
+            }
+        }
+
+        // Écriture sécurisée car threadID < actualThreads
+        threadResults[threadID].minDist = localMinDist;
+        threadResults[threadID].target = localTarget;
+    }
+
+    // --- ÉTAPE 3 : Réduction finale ---
+    float globalMinDist = std::numeric_limits<float>::max();
+    Zombie* globalTarget = nullptr;
+
+    // On parcourt uniquement les résultats des threads qui ont réellement tourné
+    for (int i = 0; i < actualThreads; ++i)
+    {
+        if (threadResults[i].target != nullptr && threadResults[i].minDist < globalMinDist)
+        {
+            globalMinDist = threadResults[i].minDist;
+            globalTarget = threadResults[i].target;
+        }
+    }
+
+    if (globalTarget)
+    {
+        m_target = globalTarget;
+    }
+}
+
+/*
+void Bot::getTarget(GameWorld* world)
+{
+    ++m_getTargetCount;
     Zombie* zombie = nullptr;
     Zombie* target = nullptr;
     float minDist  = -1;
+
+    int i = 0;
 
     while (Zombie::getNext(zombie))
     {
         Vec2 v(zombie->getCoord(), getCoord());
         float dist = v.getNorm2();
 
-        if (dist < minDist|| minDist < 0)
+        if (dist < minDist || minDist < 0)
         {
             minDist = dist;
             target = zombie;
@@ -150,6 +242,7 @@ void Bot::getTarget(GameWorld* world)
         m_target = target;
     }
 }
+*/
 
 void Bot::hit(WorldEntity* entity, GameWorld* gameWorld)
 {

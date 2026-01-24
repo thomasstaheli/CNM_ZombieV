@@ -5,23 +5,30 @@
 #include "Bot.hpp"
 #include "System/Utils.hpp"
 #include "Hunter.hpp"
+#include "UnitedEngine/U_2DCollisionManager.h"  // Pour GridCell et phyManager
 
 #include <iostream>
+#include <iostream>
+#include <cfloat>  // Pour FLT_MAX
+#include <cmath>   // Pour sqrt
 
 uint64_t      Zombie::_moveTextureID;
 uint64_t      Zombie::_attackTextureID;
 Animation   Zombie::_moveAnimation(3, 6, 288, 311, 17, 20);
 Animation   Zombie::_attackAnimation(3, 3, 954/3, 882/3, 9, 20);
+const float Zombie::TARGET_SEARCH_INTERVAL = 0.5f;  // Recherche tous les 0.5 secondes
 
 Zombie::Zombie() :
-    StandardEntity()
+    StandardEntity(),
+    _targetSearchCooldown(0.0f)
 {
 
 }
 
 Zombie::Zombie(float x, float y) :
     StandardEntity(x, y, 0.0f),
-    _vertexArray(sf::VertexArray(sf::Quads, 4))
+    _vertexArray(sf::VertexArray(sf::Quads, 4)),
+    _targetSearchCooldown(0.0f)  // Initialiser le cooldown
 {
     _speed = 500;
     _life  = 100;
@@ -61,59 +68,70 @@ void Zombie::update(GameWorld& world)
     {
         WorldEntity* target = world.getEntityByID(_target);
 
-        /*std::cout << target->getCoord().x << std::endl;
-        std::cout << target->getCoord().y << std::endl;
-        std::cout << m_coord.x << std::endl;
-        std::cout << m_coord.y << std::endl;*/
-
-        Vec2 vTarget(target->getCoord(), m_coord);
-        Vec2 direction(cos(_angle), sin(_angle));
-        Vec2 directionNormal(-direction.y, direction.x);
-
-        /*std::cout << "end" << std::endl;*/
-
-        float dist = vTarget.getNorm();
-        float vx = vTarget.x/dist;
-        float vy = vTarget.y/dist;
-
-        float dot2 = vx*directionNormal.x + vy*directionNormal.y;
-        float coeff = 0.04f;
-
-        float absDot = std::abs(dot2);
-        coeff *= absDot;
-
-        _angle += dot2>0?-coeff:coeff;
-
-        if (_currentState == MOVING)
+        if (target)
         {
-            // float speed = 75;
-            move(_speed*direction.x, _speed*direction.y);
-        }
-        else if (_currentAnimation.isDone())
-        {
-            if (dist < 3*CELL_SIZE)
-            {
-                // Need to create damage variable
-                target->addLife(-5);
-                world.addEntity(ExplosionProvider::getBase(target->getCoord()));
+            Vec2 vTarget(target->getCoord(), m_coord);
+            Vec2 direction(cos(_angle), sin(_angle));
+            Vec2 directionNormal(-direction.y, direction.x);
+
+            // Optimisation: Utiliser getNorm2() au lieu de getNorm() + sqrt
+            float dist2 = vTarget.getNorm2();
+            float dist = sqrt(dist2);  // Calculé une seule fois
+            
+            // Vérifier la division par zéro
+            if (dist > 0.0001f) {
+                float vx = vTarget.x / dist;
+                float vy = vTarget.y / dist;
+
+                float dot2 = vx * directionNormal.x + vy * directionNormal.y;
+                float coeff = 0.04f;
+
+                float absDot = std::abs(dot2);
+                coeff *= absDot;
+
+                _angle += dot2 > 0 ? -coeff : coeff;
+
+                if (_currentState == MOVING)
+                {
+                    move(_speed * direction.x, _speed * direction.y);
+                }
+                else if (_currentAnimation.isDone())
+                {
+                    // Comparaison sans sqrt: utiliser dist2 pour éviter le sqrt
+                    const float ATTACK_RANGE = 3.0f * CELL_SIZE;
+                    const float ATTACK_RANGE2 = ATTACK_RANGE * ATTACK_RANGE;
+                    
+                    if (dist2 < ATTACK_RANGE2)
+                    {
+                        target->addLife(-5);
+                        world.addEntity(ExplosionProvider::getBase(target->getCoord()));
+                    }
+                }
+
+                if (target->isDying())
+                    _target = ENTITY_NULL;
             }
         }
-
-        if (target->isDying())
+        else
+        {
+            // Target invalide, rechercher un nouveau
             _target = ENTITY_NULL;
-
+            _targetSearchCooldown = 0.0f;
+        }
     }
     else
     {
-        _getTarget();
+        // Recherche de target avec cooldown (optimisation clé!)
+        _targetSearchCooldown -= DT;
+        if (_targetSearchCooldown <= 0.0f)
+        {
+            _getTargetOptimized(world);  // Utiliser la version optimisée
+            _targetSearchCooldown = TARGET_SEARCH_INTERVAL;  // Attendre avant la prochaine recherche
+        }
     }
 
-    if (_life<0)
+    if (_life < 0)
     {
-        // Flaque de sang lorsque le zombie meurt
-        //world.addEntity(ExplosionProvider::getBig(m_coord, true));
-        //world.addEntity(ExplosionProvider::getBigFast(m_coord));
-        //world.addEntity(ExplosionProvider::getBase(m_coord));
         _done = true;
     }
 
@@ -124,6 +142,115 @@ void Zombie::update(GameWorld& world)
     }
 
     m_coord = getBodyCoord();
+}
+
+/**
+ * VERSION ORIGINALE (Conservée pour compatibilité)
+ * Scanne TOUS les hunters - O(n) - LENT
+ */
+void Zombie::_getTarget()
+{
+    Hunter*  hunter = nullptr;
+    EntityID target = ENTITY_NULL;
+    float minDist  = -1;
+
+    while (Hunter::getNext(hunter))
+    {
+        Vec2 v(hunter->getCoord(), m_coord);
+        float dist = v.getNorm2();
+
+        if ((dist < minDist || minDist < 0) && !hunter->isDying())
+        {
+            minDist = dist;
+            target = hunter->getID();
+        }
+    }
+
+    if (target)
+    {
+        setTarget(target);
+    }
+}
+
+/**
+ * VERSION OPTIMISÉE - NOUVELLE
+ * Utilise la grille spatiale pour chercher seulement les hunters proches
+ * 
+ * Gain de performance:
+ * - Avant: Scanne TOUS les hunters (peut être 1000+)
+ * - Après: Scanne seulement ~9 cellules de grille = ~50 zombies max par cellule
+ * 
+ */
+void Zombie::_getTargetOptimized(GameWorld& world)
+{
+    // 1. Récupérer le collisionManager
+    U_2DCollisionManager& phyManager = world.getPhyManager();
+    
+    // 2. Déterminer la position et paramètres de la recherche
+    Vec2 zombiePos = m_coord;
+    EntityID closestTarget = ENTITY_NULL;
+    float closestDist2 = FLT_MAX;  // Distance au carré du plus proche
+    
+    // 3. PARAMÈTRES DE RECHERCHE
+    // La grille utilise CELL_SIZE comme unité (voir U_2DCollisionManager)
+    float cellSize = phyManager.getBodyRadius() * 2.0f;  // CELL_SIZE équivalent
+    
+    // Rayon de recherche: 3 cellules = couverture 9 cellules (3x3)
+    const int SEARCH_RADIUS = 1;  // -1 à +1 en x et y = 3x3 cellules
+    
+    // 4. BOUCLE DE RECHERCHE SUR LA GRILLE
+    // Au lieu de chercher dans TOUS les hunters, on cherche seulement
+    // dans les 9 cellules voisines
+    #pragma omp parallel for collapse(2) reduction(min:closestDist2) shared(closestTarget)
+    for (int dx = -SEARCH_RADIUS; dx <= SEARCH_RADIUS; dx++)
+    {
+        for (int dy = -SEARCH_RADIUS; dy <= SEARCH_RADIUS; dy++)
+        {
+            // Calculer la position de la cellule voisine
+            Vec2 checkPos = zombiePos + Vec2(dx * cellSize, dy * cellSize);
+            
+            // Récupérer les corps physiques dans cette cellule
+            GridCell* cell = world.getBodiesAt(checkPos);
+            
+            if (cell)
+            {
+                // 5. SCANNER LES CORPS DANS CETTE CELLULE
+                for (int i = 0; i < cell->_maxIndex; i++)
+                {
+                    U2DBody_ptr body = cell->_bodies[i];
+                    if (!body) continue;
+                    
+                    // Récupérer l'entité associée au corps physique
+                    WorldEntity* entity = body->getEntity();
+                    if (!entity) continue;
+                    
+                    // Vérifier que c'est un Hunter
+                    if (entity->getType() != EntityTypes::HUNTER) continue;
+                    
+                    // Vérifier que le Hunter n'est pas en train de mourir
+                    Hunter* hunter = static_cast<Hunter*>(entity);
+                    if (hunter->isDying()) continue;
+                    
+                    // 6. CALCULER LA DISTANCE AU CARRÉ (sans sqrt!)
+                    Vec2 delta = hunter->getCoord() - zombiePos;
+                    float dist2 = delta.x * delta.x + delta.y * delta.y;
+                    
+                    // 7. METTRE À JOUR LE PLUS PROCHE SI NÉCESSAIRE
+                    if (dist2 < closestDist2)
+                    {
+                        closestDist2 = dist2;
+                        closestTarget = hunter->getID();
+                    }
+                }
+            }
+        }
+    }
+    
+    // 8. SI UN TARGET A ÉTÉ TROUVÉ
+    if (closestTarget != ENTITY_NULL)
+    {
+        setTarget(closestTarget);
+    }
 }
 
 void Zombie::render()
@@ -178,26 +305,12 @@ void Zombie::hit(WorldEntity* entity, GameWorld* gameWorld)
                     gameWorld->addEntity(ExplosionProvider::getClose(pos, bulletAngle));
                     gameWorld->addEntity(Guts::add(pos, bullet->getV()*40.f));
                 }
-                // Sang lors qu'une balle touche un zombies
-                /*
-                if (bullet->getPenetration() > -1.0f)
-                {
-                    gameWorld->addEntity(ExplosionProvider::getThrough(pos, bulletAngle, true));
-                    gameWorld->addEntity(ExplosionProvider::getBigThrough(pos, bulletAngle));
-                    gameWorld->addEntity(ExplosionProvider::getHit(pos, bulletAngle, true));
-                }
-                else
-                {
-                    gameWorld->addEntity(ExplosionProvider::getHit(pos, bulletAngle+PI, true));
-                }
-                */
             }
 
             break;
         }
         case(EntityTypes::HUNTER) :
         {
-            //_target = static_cast<Hunter*>(entity)->getGlobalIndex();
             if (_currentState != ATTACKING)
             {
                 _currentState     = ATTACKING;
@@ -217,45 +330,3 @@ void Zombie::initPhysics(GameWorld* world)
 {
     m_initBody(world);
 }
-
-void Zombie::_getTarget()
-{
-    Hunter*  hunter = nullptr;
-    EntityID target = ENTITY_NULL;
-    float minDist  = -1;
-
-    while (Hunter::getNext(hunter))
-    {
-        Vec2 v(hunter->getCoord(), m_coord);
-        float dist = v.getNorm2();
-
-        if ((dist < minDist|| minDist < 0) && !hunter->isDying())
-        {
-            minDist = dist;
-            target = hunter->getID();
-        }
-    }
-
-    /*Bot* b = nullptr;
-    while (Bot::getNext(b))
-    {
-        Vec2 v(b->getCoord(), getCoord());
-        float dist = v.getNorm2();
-
-        if ((dist < minDist|| minDist < 0) && !b->isDying())
-        {
-            minDist = dist;
-            target = b->getGlobalIndex();
-        }
-    }*/
-
-
-    if (target)
-    {
-        setTarget(target);
-    }
-}
-
-
-
-

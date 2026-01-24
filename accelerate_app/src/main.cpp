@@ -142,8 +142,9 @@ int main()
             // for (int i(waveCount*waveCount + 10); i--;)
             for (int i(waveCount*1000 + 100); i--;)
             {
-                Zombie* newZombie(Zombie::newEntity(getRandUnder(static_cast<float>(MAP_SIZE)), getRandUnder(static_cast<float>(MAP_SIZE))));
-                //newZombie->setTarget(&(*Hunter::getObjects().front()));
+                newZombie = Zombie::newEntity(getRandUnder(static_cast<float>(MAP_SIZE)), getRandUnder(static_cast<float>(MAP_SIZE)));
+                EntityID target = h.getID();
+                newZombie->setTarget(target);
                 world.addEntity(newZombie);
             }
         }
@@ -153,7 +154,7 @@ int main()
         {
             if (event.type == sf::Event::Closed) window.close();
             if (event.type == sf::Event::KeyPressed)
-                if (event.key.code == sf::Keyboard::Escape) window.close();
+            if (event.key.code == sf::Keyboard::Escape) window.close();
         }
 
         sf::Clock clock;

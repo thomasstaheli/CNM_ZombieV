@@ -18,6 +18,12 @@ public:
 private:
     WorldEntity* m_target;
     size_t m_getTargetCount;
+    
+    // OPTIMISATIONS AJOUTÉES:
+    float m_targetSearchCooldown;  // Cooldown avant de rechercher un nouveau target
+    float m_lastBotX, m_lastBotY;  // Cache de la dernière position pour éviter getCoord()
+    
+    static const float TARGET_SEARCH_INTERVAL;  // 0.5 secondes entre les recherches
 
     void computeControls(GameWorld& world);
     void getTarget(GameWorld* world);
