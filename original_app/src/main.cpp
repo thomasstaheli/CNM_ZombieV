@@ -42,11 +42,12 @@ int main()
     // Tableau de bot
     std::array<Bot*, 10> bots;
     // Joueur
-    //world.addEntity(&h);
+    world.addEntity(&h);
 
     int waveCount = 0;
 
     // Création de 10 bots
+    
     for (int i = 0; i < 10; ++i)
     {
         bots[i] = Bot::newEntity(static_cast<float>(MAP_SIZE / 2 + rand() % 10), 
@@ -63,7 +64,8 @@ int main()
     {
         newZombie = Zombie::newEntity(getRandUnder(static_cast<float>(MAP_SIZE)), getRandUnder(static_cast<float>(MAP_SIZE)));
 		Bot& bot = *bots[i % 10];
-		EntityID target = bot.getID();
+		EntityID target; // = bot.getID();
+        target = h.getID();
 		newZombie->setTarget(target);
         world.addEntity(newZombie);
     }
