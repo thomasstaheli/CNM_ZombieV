@@ -4,6 +4,7 @@
 #include "U_2DBody.h"
 #include "U_2DConstraint.h"
 #include "UnitedEngine/Types.hpp"
+#include "UnitedEngine/CudaPhysics.hpp"
 
 #include <unordered_map>
 #include <vector>
@@ -11,7 +12,6 @@
 #include <list>
 #include <array>
 #include <memory>
-
 
 typedef U_2DBody* U2DBody_ptr;
 
@@ -62,6 +62,9 @@ private:
 
     long m_currentIteration;
     int  m_newHash;
+
+    // Pour cuda
+    CudaPhysics m_cudaPhysics;
 
     std::list<U_2DConstraint> m_constraints;
     std::unordered_map<long, GridCell> m_grid;

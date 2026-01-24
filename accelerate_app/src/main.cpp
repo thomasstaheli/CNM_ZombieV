@@ -64,7 +64,7 @@ int main()
     {
         newZombie = Zombie::newEntity(getRandUnder(static_cast<float>(MAP_SIZE)), getRandUnder(static_cast<float>(MAP_SIZE)));
 		Bot& bot = *bots[i % 10];
-		EntityID target; // = bot.getID();
+		EntityID target = bot.getID();
         target = h.getID();
 		newZombie->setTarget(target);
         world.addEntity(newZombie);
@@ -138,6 +138,7 @@ int main()
         if (Zombie::getObjectsCount() == 0)
         {
             ++waveCount;
+
             // for (int i(waveCount*waveCount + 10); i--;)
             for (int i(waveCount*1000 + 100); i--;)
             {

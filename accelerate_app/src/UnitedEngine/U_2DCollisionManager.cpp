@@ -1,11 +1,12 @@
 #include "UnitedEngine/UnitedEngine.h"
+#include "Zombie.hpp"
 #include <iostream>
 #include <SFML/Graphics.hpp>
 
 #include <System/WorldEntity.hpp>
 #include <System/GameWorld.hpp>
 
-#include <thread>
+#include <omp.h>
 
 GridCell::GridCell()
 {
@@ -233,13 +234,75 @@ void U_2DCollisionManager::update()
     //std::cout << "Phys time : " << c2.getElapsedTime().asMilliseconds() << std::endl;
     //std::cout << "Constraints " << m_constraints.size() << std::endl;
 
+    // Préparation des vecteurs (SoA - Structure of Arrays)
+    std::vector<float> pX, pY, oldX, oldY, aX, aY;
+    std::vector<U_2DBody*> activeBodies;
+
+    // Reservation mémoire pour éviter les réallocations CPU
+    // (Une optimisation serait de rendre ces vectors membres de la classe)
+    size_t estSize = 10000; 
+    pX.reserve(estSize); pY.reserve(estSize);
+    oldX.reserve(estSize); oldY.reserve(estSize);
+    aX.reserve(estSize); aY.reserve(estSize);
+    activeBodies.reserve(estSize);
+
+    b = nullptr;
+    while (U_2DBody::getNext(b))
+    {
+        // On ignore les objets statiques ou "morts"
+        if (b->isStatic()) continue;
+
+        Vec2 pos = b->getPosition();
+        Vec2 lastPos = b->getLastPosition();
+        Vec2 acc = b->getAcceleration();
+        Vec2 vel = b->getVelocity();
+
+        pX.push_back(pos.x);
+        pY.push_back(pos.y);
+        oldX.push_back(lastPos.x);
+        oldY.push_back(lastPos.y);
+        
+        // On applique la friction (-10 * vel) ICI sur le CPU avant d'envoyer
+        // Cela simplifie grandement le kernel CUDA (juste des additions)
+        // Code original: accelerate2D(-10*velocity.x, -10*velocity.y);
+        aX.push_back(acc.x - 10.0f * vel.x);
+        aY.push_back(acc.y - 10.0f * vel.y);
+
+        activeBodies.push_back(b);
+    }
+
+    int count = pX.size();
+
+    if (count > 0)
+    {
+        // Appel à la librairie cuBLAS
+        // Note: on passe pX/pY en entrée ET en sortie
+        m_cudaPhysics.updatePositions(pX, pY, oldX, oldY, aX, aY, pX, pY, m_timeStep, count);
+
+        // Réinjection des résultats dans les objets du jeu
+        for (int i = 0; i < count; ++i)
+        {
+            U_2DBody* body = activeBodies[i];
+            
+            // Logique de mise à jour "Verlet" : l'ancienne pos devient l'actuelle
+            body->setLastPosition(body->getPosition());
+            
+            // La nouvelle pos vient du calcul GPU
+            body->setPosition(pX[i], pY[i]);
+            
+            // Reset accélération
+            body->setAcceleration(Vec2(0,0));
+        }
+    }
+
     // friction
+    /* OLD
     while (U_2DBody::getNext(b))
     {
         Vec2 velocity = b->getVelocity();
         b->accelerate2D(-10*velocity.x, -10*velocity.y);
         b->updatePosition(m_timeStep);
-    }
+    }*/
 }
 
 void U_2DCollisionManager::solveConstraints()
@@ -311,18 +374,3 @@ U_2DBody* U_2DCollisionManager::getBodyByID(BodyID id)
 {
     return U_2DBody::getObjectAt(static_cast<uint32_t>(id));
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

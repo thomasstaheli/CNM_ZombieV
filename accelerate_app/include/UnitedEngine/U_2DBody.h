@@ -39,6 +39,13 @@ public:
     WorldEntity* getEntity();
     float getAngle(U_2DBody* body);
 
+    // --- AJOUTS POUR CUDA ---
+    const Vec2& getLastPosition() const { return m_lastPosition; }
+    const Vec2& getAcceleration() const { return m_acceleration; }
+
+    void setLastPosition(const Vec2& pos) { m_lastPosition = pos; }
+    void setAcceleration(const Vec2& acc) { m_acceleration = acc; }
+
 private:
     void init(Vec2 position, float mass, bool included);
 
