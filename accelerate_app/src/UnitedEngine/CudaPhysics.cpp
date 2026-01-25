@@ -34,6 +34,12 @@ void CudaPhysics::allocateBuffers(int count) {
     }
 }
 
+/*
+* Nouvelle version, avec l'update des positions via cuBLASS
+* Nous avons utilisé cuBLASS, car c'était demandé dans la consigne, mais nous pensons
+* que si nous venions à utiliser CUDA simplement, cela optimiserait beaucoup les calculs
+* et on aurait besoin de moins de mémoire GPU.
+*/
 void CudaPhysics::updatePositions(
     const std::vector<float>& in_posX, const std::vector<float>& in_posY,
     const std::vector<float>& in_oldX, const std::vector<float>& in_oldY,
@@ -41,12 +47,12 @@ void CudaPhysics::updatePositions(
     std::vector<float>& out_posX, std::vector<float>& out_posY,
     float dt, int count) 
 {
-    // 1. Allocation dynamique si le nombre de zombies a augmenté
+    // Allocation dynamique si le nombre de zombies a augmenté
     allocateBuffers(count);
 
     size_t size = count * sizeof(float);
 
-    // 2. Transfert CPU (Host) -> GPU (Device)
+    // Transfert CPU -> GPU
     // On copie les vecteurs contigus
     cudaMemcpy(d_posX, in_posX.data(), size, cudaMemcpyHostToDevice);
     cudaMemcpy(d_posY, in_posY.data(), size, cudaMemcpyHostToDevice);
@@ -55,7 +61,7 @@ void CudaPhysics::updatePositions(
     cudaMemcpy(d_accX, in_accX.data(), size, cudaMemcpyHostToDevice);
     cudaMemcpy(d_accY, in_accY.data(), size, cudaMemcpyHostToDevice);
 
-    // 3. CALCUL PHYSIQUE AVEC CUBLAS (SAXPY)
+    // Calcul de la physqiue avec Saxpy
     // Formule Verlet : Pos = Pos + (Pos - OldPos) + Acc * dt
     // SAXPY fait : Y = alpha * X + Y
 
@@ -65,28 +71,27 @@ void CudaPhysics::updatePositions(
 
     // --- AXE X ---
     
-    // A. Calcul de la vélocité (V = Pos - OldPos)
+    // Calcul de la vélocité (V = Pos - OldPos)
     // On copie Pos dans Temp
     cudaMemcpy(d_tempX, d_posX, size, cudaMemcpyDeviceToDevice); 
     // Temp = -1.0 * OldPos + Temp  =>  Temp = Pos - OldPos
     cublasSaxpy(handle, count, &alpha_minus_1, d_oldX, 1, d_tempX, 1);
 
-    // B. Ajout de l'accélération (V = V + Acc * dt)
+    // Ajout de l'accélération (V = V + Acc * dt)
     // Temp = dt * Acc + Temp
     cublasSaxpy(handle, count, &alpha_dt, d_accX, 1, d_tempX, 1);
 
-    // C. Mise à jour Position (Pos = Pos + V)
+    // Mise à jour Position (Pos = Pos + V)
     // Pos = 1.0 * Temp + Pos
     cublasSaxpy(handle, count, &alpha_1, d_tempX, 1, d_posX, 1);
 
-
-    // --- AXE Y (Même logique) ---
+    // --- AXE Y ---
     cudaMemcpy(d_tempY, d_posY, size, cudaMemcpyDeviceToDevice); 
     cublasSaxpy(handle, count, &alpha_minus_1, d_oldY, 1, d_tempY, 1);
     cublasSaxpy(handle, count, &alpha_dt, d_accY, 1, d_tempY, 1);
     cublasSaxpy(handle, count, &alpha_1, d_tempY, 1, d_posY, 1);
 
-    // 4. Transfert GPU (Device) -> CPU (Host)
+    // Transfert GPU -> CPU
     // On récupère les nouvelles positions
     cudaMemcpy(out_posX.data(), d_posX, size, cudaMemcpyDeviceToHost);
     cudaMemcpy(out_posY.data(), d_posY, size, cudaMemcpyDeviceToHost);

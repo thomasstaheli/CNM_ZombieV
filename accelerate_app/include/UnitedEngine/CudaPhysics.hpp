@@ -7,10 +7,10 @@
 
 class CudaPhysics {
 private:
-    // Pointeurs vers la mémoire du GPU (Device)
+    // Pointeurs vers la mémoire du GPU
     float *d_posX, *d_posY;   // Position actuelle
     float *d_oldX, *d_oldY;   // Ancienne position
-    float *d_accX, *d_accY;   // Accélération (incluant friction)
+    float *d_accX, *d_accY;   // Accélération avec friction
     
     // Buffers temporaires pour les calculs intermédiaires (Velocity)
     float *d_tempX, *d_tempY; 
@@ -25,7 +25,7 @@ public:
     CudaPhysics();
     ~CudaPhysics();
 
-    // Fonction principale qui fait l'aller-retour CPU -> GPU -> CPU
+    // Fonction principale qui update les positions avec le GPU
     void updatePositions(
         const std::vector<float>& in_posX, const std::vector<float>& in_posY,
         const std::vector<float>& in_oldX, const std::vector<float>& in_oldY,

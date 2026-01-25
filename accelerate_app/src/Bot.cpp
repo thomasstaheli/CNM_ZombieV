@@ -139,10 +139,15 @@ void Bot::getTarget(GameWorld* world)
 {
     ++m_getTargetCount;
 
-    // --- ÉTAPE 1 : Préparation ---
+    // Préparation des données
+    // Comme indiqué dans le rapport, cette étape est très lente et elle ralenti fortement processus
+    // le fait d'applatir les données, cela gâche nos performances
+    // Une solution proposée, serait de revoir le système complet de stockage des entités
+    // en évitant à tout pris la Pool d'objet (liste) et en utilisant des vecteurs pour chaque type d'entité
     std::vector<Zombie*> zombies;
     zombies.reserve(10000);
     Zombie* z = nullptr;
+    // On ne peut pas paraléliser cette étape
     while (Zombie::getNext(z)) {
         zombies.push_back(z);
     }
@@ -153,17 +158,16 @@ void Bot::getTarget(GameWorld* world)
     Vec2 myPos = getCoord();
 
     // On détermine combien de threads on veut utiliser AU MAXIMUM
+    // On véite d'utiliser tous les threads (sur le PC de test => 20 threads max)
     int desiredThreads = 10; 
-    
     // On récupère le max possible sur la machine pour ne pas demander l'impossible
     int hardwareMax = omp_get_max_threads();
     int actualThreads = std::min(desiredThreads, hardwareMax);
 
-    // On crée le tableau de résultats avec la taille EXACTE du nombre de threads qu'on va lancer
+    // On crée le tableau de résultats avec la taille exacte du nombre de threads qu'on va lancer
     std::vector<SearchResult> threadResults(actualThreads);
     
-    // --- ÉTAPE 2 : Recherche Parallèle ---
-    // On force le nombre de threads ici avec num_threads()
+    // On sépare les zombies, on chaque thread calcule son minimum local
     #pragma omp parallel num_threads(actualThreads)
     {
         int threadID = omp_get_thread_num();
@@ -174,7 +178,7 @@ void Bot::getTarget(GameWorld* world)
 
         // On laisse OpenMP découper la boucle complète (0 à nZombies)
         // C'est beaucoup plus sûr que le calcul manuel
-        #pragma omp for nowait
+        // #pragma omp for nowait
         for (int i = 0; i < nZombies; ++i)
         {
             Zombie* currentZombie = zombies[i];
@@ -195,11 +199,13 @@ void Bot::getTarget(GameWorld* world)
         threadResults[threadID].target = localTarget;
     }
 
-    // --- ÉTAPE 3 : Réduction finale ---
+    // Barrière implicite ici
+
+    // Maintenant que tous les threads ont fini leur travail
     float globalMinDist = std::numeric_limits<float>::max();
     Zombie* globalTarget = nullptr;
 
-    // On parcourt uniquement les résultats des threads qui ont réellement tourné
+    // On parcourt tous les résultats afin de déterminer le minimum des minimums locaux des threads
     for (int i = 0; i < actualThreads; ++i)
     {
         if (threadResults[i].target != nullptr && threadResults[i].minDist < globalMinDist)
@@ -215,7 +221,7 @@ void Bot::getTarget(GameWorld* world)
     }
 }
 
-/*
+/* OLD
 void Bot::getTarget(GameWorld* world)
 {
     ++m_getTargetCount;
@@ -225,6 +231,7 @@ void Bot::getTarget(GameWorld* world)
 
     int i = 0;
 
+    // Parcourt tous les zombies -> très lourd si le nombre de bot est élevé
     while (Zombie::getNext(zombie))
     {
         Vec2 v(zombie->getCoord(), getCoord());

@@ -234,11 +234,11 @@ void U_2DCollisionManager::update()
     //std::cout << "Phys time : " << c2.getElapsedTime().asMilliseconds() << std::endl;
     //std::cout << "Constraints " << m_constraints.size() << std::endl;
 
-    // Préparation des vecteurs (SoA - Structure of Arrays)
+    // Préparation des vecteurs -> Applatir
     std::vector<float> pX, pY, oldX, oldY, aX, aY;
     std::vector<U_2DBody*> activeBodies;
 
-    // Reservation mémoire pour éviter les réallocations CPU
+    // Reservation mémoire pour éviter les réallocations CPU à cause des push_back
     // (Une optimisation serait de rendre ces vectors membres de la classe)
     size_t estSize = 10000; 
     pX.reserve(estSize); pY.reserve(estSize);
@@ -247,9 +247,14 @@ void U_2DCollisionManager::update()
     activeBodies.reserve(estSize);
 
     b = nullptr;
+
+    // Comme dis Bot.cpp -> Bot::getTarget(), cette partie est très lente
+    // car on ne peut pas la paraléliser, puisque la structure mémoire ne le permet pas
+    // Optimisation possible, mais demande le changement du jeu entier, modifier la structure
+    // mémoire par des vecteurs (zombies, hunter, bot, bullet, ...) -> contigus
     while (U_2DBody::getNext(b))
     {
-        // On ignore les objets statiques ou "morts"
+        // On ignore les objets statiques
         if (b->isStatic()) continue;
 
         Vec2 pos = b->getPosition();
@@ -280,16 +285,16 @@ void U_2DCollisionManager::update()
         m_cudaPhysics.updatePositions(pX, pY, oldX, oldY, aX, aY, pX, pY, m_timeStep, count);
 
         // Réinjection des résultats dans les objets du jeu
+        // Ici on aurait pu penser à faire un omp parallel for, mais cela créer de l'overhead
+        // car on fait beaucoup d'accès mémoire en parallèle et aucun calcul
+        // #pragma omp parallel for schedule(static)
         for (int i = 0; i < count; ++i)
         {
             U_2DBody* body = activeBodies[i];
-            
             // Logique de mise à jour "Verlet" : l'ancienne pos devient l'actuelle
             body->setLastPosition(body->getPosition());
-            
             // La nouvelle pos vient du calcul GPU
             body->setPosition(pX[i], pY[i]);
-            
             // Reset accélération
             body->setAcceleration(Vec2(0,0));
         }

@@ -144,9 +144,9 @@ void Zombie::update(GameWorld& world)
     m_coord = getBodyCoord();
 }
 
-/**
- * VERSION ORIGINALE (Conservée pour compatibilité)
- * Scanne TOUS les hunters - O(n) - LENT
+/*
+ * Version original de _getTarget
+ * Cette fonction parcourt tous les hunters et récupère le plus proche  
  */
 void Zombie::_getTarget()
 {
@@ -154,6 +154,7 @@ void Zombie::_getTarget()
     EntityID target = ENTITY_NULL;
     float minDist  = -1;
 
+    // Ici, on aurait pu imaginer faire comme
     while (Hunter::getNext(hunter))
     {
         Vec2 v(hunter->getCoord(), m_coord);
@@ -173,34 +174,28 @@ void Zombie::_getTarget()
 }
 
 /**
- * VERSION OPTIMISÉE - NOUVELLE
+ * Nouvelle version
  * Utilise la grille spatiale pour chercher seulement les hunters proches
- * 
- * Gain de performance:
- * - Avant: Scanne TOUS les hunters (peut être 1000+)
- * - Après: Scanne seulement ~9 cellules de grille = ~50 zombies max par cellule
- * 
+ * Cette version est optimisée dans le cas ou il y a beaucoup de hunters
+ * Ce n'est pas forcément la version la plus idéale pour trouver des hunters
  */
 void Zombie::_getTargetOptimized(GameWorld& world)
 {
-    // 1. Récupérer le collisionManager
     U_2DCollisionManager& phyManager = world.getPhyManager();
     
-    // 2. Déterminer la position et paramètres de la recherche
+    // Déterminer la position et paramètres de la recherche
     Vec2 zombiePos = m_coord;
     EntityID closestTarget = ENTITY_NULL;
     float closestDist2 = FLT_MAX;  // Distance au carré du plus proche
     
-    // 3. PARAMÈTRES DE RECHERCHE
     // La grille utilise CELL_SIZE comme unité (voir U_2DCollisionManager)
     float cellSize = phyManager.getBodyRadius() * 2.0f;  // CELL_SIZE équivalent
     
-    // Rayon de recherche: 3 cellules = couverture 9 cellules (3x3)
-    const int SEARCH_RADIUS = 1;  // -1 à +1 en x et y = 3x3 cellules
+    // Rayon de recherche: 5 cellules = couverture 25 cellules (5x5)
+    const int SEARCH_RADIUS = 5;  // -2 à +2 en x et y = 5x5 cellules
     
-    // 4. BOUCLE DE RECHERCHE SUR LA GRILLE
     // Au lieu de chercher dans TOUS les hunters, on cherche seulement
-    // dans les 9 cellules voisines
+    // dans les 25 cellules voisines
     #pragma omp parallel for collapse(2) reduction(min:closestDist2) shared(closestTarget)
     for (int dx = -SEARCH_RADIUS; dx <= SEARCH_RADIUS; dx++)
     {
@@ -208,13 +203,12 @@ void Zombie::_getTargetOptimized(GameWorld& world)
         {
             // Calculer la position de la cellule voisine
             Vec2 checkPos = zombiePos + Vec2(dx * cellSize, dy * cellSize);
-            
             // Récupérer les corps physiques dans cette cellule
             GridCell* cell = world.getBodiesAt(checkPos);
             
             if (cell)
             {
-                // 5. SCANNER LES CORPS DANS CETTE CELLULE
+                // SCANNER LES CORPS DANS CETTE CELLULE
                 for (int i = 0; i < cell->_maxIndex; i++)
                 {
                     U2DBody_ptr body = cell->_bodies[i];
@@ -231,11 +225,11 @@ void Zombie::_getTargetOptimized(GameWorld& world)
                     Hunter* hunter = static_cast<Hunter*>(entity);
                     if (hunter->isDying()) continue;
                     
-                    // 6. CALCULER LA DISTANCE AU CARRÉ (sans sqrt!)
+                    // Calcul de la distance au carré
                     Vec2 delta = hunter->getCoord() - zombiePos;
                     float dist2 = delta.x * delta.x + delta.y * delta.y;
                     
-                    // 7. METTRE À JOUR LE PLUS PROCHE SI NÉCESSAIRE
+                    // Mise à jour du target, si celui est plus proche
                     if (dist2 < closestDist2)
                     {
                         closestDist2 = dist2;
@@ -246,7 +240,7 @@ void Zombie::_getTargetOptimized(GameWorld& world)
         }
     }
     
-    // 8. SI UN TARGET A ÉTÉ TROUVÉ
+    // Si un target est trouvé, alors on le set
     if (closestTarget != ENTITY_NULL)
     {
         setTarget(closestTarget);

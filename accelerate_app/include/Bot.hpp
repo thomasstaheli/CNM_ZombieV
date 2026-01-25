@@ -19,7 +19,7 @@ private:
     WorldEntity* m_target;
     size_t m_getTargetCount;
     
-    // OPTIMISATIONS AJOUTÉES:
+    // Optimisations
     float m_targetSearchCooldown;  // Cooldown avant de rechercher un nouveau target
     float m_lastBotX, m_lastBotY;  // Cache de la dernière position pour éviter getCoord()
     
