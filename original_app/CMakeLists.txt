@@ -16,7 +16,6 @@ file(GLOB source_files
 set(SOURCES ${source_files})
 set(CMAKE_CXX_STANDARD 11)
 
-# Detect and add SFML
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules" ${CMAKE_MODULE_PATH})
 find_package(SFML 2 REQUIRED COMPONENTS audio graphics window system)
 
@@ -27,7 +26,6 @@ if (UNIX)
    target_link_libraries(${PROJECT_NAME} pthread)
 endif (UNIX)
 
-# Copy data dir to the binary directory
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 if(MSVC)

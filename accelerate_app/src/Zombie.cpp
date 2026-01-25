@@ -196,7 +196,7 @@ void Zombie::_getTargetOptimized(GameWorld& world)
     
     // Au lieu de chercher dans TOUS les hunters, on cherche seulement
     // dans les 25 cellules voisines
-    #pragma omp parallel for collapse(2) reduction(min:closestDist2) shared(closestTarget)
+    //#pragma omp parallel for collapse(2) reduction(min:closestDist2) shared(closestTarget)
     for (int dx = -SEARCH_RADIUS; dx <= SEARCH_RADIUS; dx++)
     {
         for (int dy = -SEARCH_RADIUS; dy <= SEARCH_RADIUS; dy++)

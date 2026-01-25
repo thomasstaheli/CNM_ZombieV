@@ -7,6 +7,8 @@
 #include "Props/Props.hpp"
 #include "Turret.hpp"
 
+#include <omp.h>
+
 GameWorld::GameWorld() :
     _dt(0.016f),
     _level(MAP_SIZE, MAP_SIZE),

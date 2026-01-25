@@ -56,7 +56,7 @@ private:
     static Animation _moveAnimation;
     static Animation _attackAnimation;
 
-    // Optimisation: Cache de target et cooldown de recherche
+    // Optimisation : Cache de target et cooldown de recherche
     float _targetSearchCooldown;
     static const float TARGET_SEARCH_INTERVAL;  // Temps avant de rechercher un nouveau target
 
